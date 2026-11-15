@@ -38,7 +38,7 @@
   #hud{position:fixed;top:0;left:0;right:0;z-index:30;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:max(12px,env(safe-area-inset-top)) 12px 10px;pointer-events:none}
   #hud>*{pointer-events:auto}
   .chip{background:var(--glass);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:8px 12px;font-size:12.5px;letter-spacing:.04em;display:flex;gap:6px;align-items:center;white-space:nowrap;user-select:none}
-  .chip b{color:var(--cyan)}
+  .chip b{color:var(--cyan);display:inline-block}
   .sep{width:1px;height:14px;background:rgba(255,255,255,.25);margin:0 2px}
   .btns{display:flex;gap:6px}
   .ibtn{cursor:pointer;justify-content:center;min-width:40px;height:36px;padding:0 11px;font-size:15px}
@@ -64,6 +64,18 @@
   #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:60}
   #flash.go{animation:fl .45s ease-out}
   @keyframes fl{0%{opacity:.85}100%{opacity:0}}
+
+  /* Finale banner + counter bump */
+  #banner{position:fixed;left:0;right:0;top:55%;z-index:55;text-align:center;pointer-events:none;opacity:0;padding:0 14px}
+  #banner.go{animation:ban 3.8s ease both}
+  #banner .b1{font-size:clamp(28px,8.5vw,46px);font-weight:900;letter-spacing:.06em;text-transform:uppercase;line-height:1.05;
+    background:linear-gradient(90deg,#ffd23c,#ff2d95,#27e1ff,#ffd23c);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 0 14px rgba(255,210,60,.85));animation:shine 1.4s linear infinite}
+  #banner .b2{margin-top:10px;font-size:14px;opacity:.92;letter-spacing:.06em;text-shadow:0 0 10px #000,0 0 4px #000}
+  @keyframes ban{0%{opacity:0;transform:scale(.5)}12%{opacity:1;transform:scale(1.08)}20%{transform:scale(1)}82%{opacity:1}100%{opacity:0;transform:scale(1.1)}}
+  @keyframes shine{to{background-position:300% 0}}
+  .bump{animation:bump .4s ease}
+  @keyframes bump{0%{transform:scale(1)}40%{transform:scale(1.55);color:#fff}100%{transform:scale(1)}}
 
   .mindar-ui-overlay.mindar-ui-scanning,.mindar-ui-overlay.mindar-ui-loading{display:none!important}
 </style>
@@ -91,6 +103,7 @@
 
 <div id="toast"></div>
 <div id="flash"></div>
+<div id="banner"><div class="b1" id="b1"></div><div class="b2" id="b2"></div></div>
 
 <div id="panel" aria-live="polite">
   <div class="card">
@@ -166,11 +179,12 @@
   // ---------- State ----------
   const found = new Set();
   let coins = 0, eggUnlocked = false, eggOpened = false, perfectShown = false;
+  let finaleBusy = false, energyN = 0, keysArrived = 0, hitN = 0;
   let muted = false, tracking = false;
   const $ = id => document.getElementById(id);
   const root = () => $('scene-root');
   const rings = [], borders = [];
-  let visor, halo, spot;
+  let visor, halo, spot, energy;
   const buzz = () => { try { navigator.vibrate && navigator.vibrate(14); } catch (e) {} };
 
   // ---------- Tiny WebAudio sfx ----------
@@ -190,6 +204,17 @@
   const blip    = () => tone([880, 1320], 0.08, 0.06);
   const coinSfx = () => tone([988, 1319], 0.09, 0.06, 'square', 0.05);
   const fanfare = () => tone([523, 659, 784, 1047, 1319], 0.22, 0.11, 'triangle', 0.09);
+  const victory = () => { tone([523, 659, 784, 1047, 784, 1047, 1319, 1568], 0.24, 0.1, 'triangle', 0.09); tone([262, 330, 392, 523], 0.6, 0.2, 'sine', 0.07); };
+  function sweep() {
+    if (muted) return;
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime;
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(180, t); o.frequency.exponentialRampToValueAtTime(1400, t + 0.9);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05, t + 0.5); g.gain.exponentialRampToValueAtTime(0.0001, t + 1);
+      o.connect(g).connect(ac.destination); o.start(t); o.stop(t + 1.05);
+    } catch (e) {}
+  }
 
   // ---------- Build the AR content ----------
   const ce = (tag, attrs = {}, parent) => {
@@ -254,6 +279,9 @@
     // Egg glow halo
     const egg = BY_ID.egg;
     halo = ce('a-circle', { radius: .16, position: `${toX(egg.px)} ${toY(egg.py)} .01`, material: ADD('#ffd23c', 0.05) }, r);
+    // Energy ring: fills up as coins are fed to the Egg
+    energy = ce('a-ring', { 'radius-inner': .078, 'radius-outer': .09, 'segments-theta': 48, 'theta-start': 90, 'theta-length': 1,
+      position: `${toX(egg.px)} ${toY(egg.py)} .022`, visible: 'false', material: ADD('#ffd23c', .9) }, r);
 
     // Guided-tour spotlight (hidden until the tour runs)
     spot = ce('a-entity', { visible: 'false', position: `0 0 .015` }, r);
@@ -310,10 +338,14 @@
   }
 
   // ---------- Panels / toast ----------
+  let panelT;
   function showPanel(tag, title, body, gold) {
     $('pTag').textContent = tag; $('pTitle').textContent = title; $('pBody').textContent = body;
     $('panel').classList.toggle('gold', !!gold);
     $('panel').classList.add('open');
+    // auto-dismiss so the panel never blocks the coins at the bottom of the poster
+    clearTimeout(panelT);
+    panelT = setTimeout(() => { if (!tourOn) $('panel').classList.remove('open'); }, 6500);
   }
   $('closePanel').onclick = () => $('panel').classList.remove('open');
 
@@ -336,6 +368,40 @@
   }
 
   // ---------- Interaction ----------
+  const eggPos = () => ({ x: toX(BY_ID.egg.px), y: toY(BY_ID.egg.py) });
+
+  function bump(id) { const el = $(id); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+
+  // expanding ring of light
+  function shock(parent, color = '#ffd23c', grow = 14, dur = 900, z = .13) {
+    const r = ce('a-ring', { 'radius-inner': .012, 'radius-outer': .022, 'segments-theta': 32, position: `0 0 ${z}`, material: ADD(color, .95) }, parent);
+    r.setAttribute('animation__g', `property: scale; from: 1 1 1; to: ${grow} ${grow} ${grow}; dur: ${dur}; easing: easeOutQuad`);
+    r.setAttribute('animation__o', `property: material.opacity; from: .95; to: 0; dur: ${dur}; easing: easeInQuad`);
+    setTimeout(() => r.remove(), dur + 100);
+  }
+
+  // Fly a collected item along a path into the Egg, then react
+  function flyToEgg(slot, pop, dur, onArrive) {
+    const e = eggPos();
+    const dx = e.x - slot.object3D.position.x, dy = e.y - slot.object3D.position.y;
+    pop.removeAttribute('animation__bob');
+    pop.setAttribute('animation__fly', `property: position; to: ${dx} ${dy} .2; dur: ${dur}; easing: easeInOutCubic`);
+    pop.setAttribute('animation__shrink', `property: scale; from: 1 1 1; to: .25 .25 .25; delay: ${Math.round(dur * .55)}; dur: ${Math.round(dur * .45)}; easing: easeInQuad`);
+    setTimeout(() => { pop.setAttribute('visible', false); onArrive && onArrive(); }, dur);
+  }
+
+  function eggHit(color = '#ffd23c') {
+    const pop = $('slot-egg').pop;
+    pop.setAttribute('animation__hit', `property: scale; from: 1 1 1; to: 1.28 1.28 1.28; dir: alternate; dur: ${130 + (hitN++ % 2)}; loop: 2; easing: easeOutQuad`);
+    shock($('slot-egg'), color, 6, 600, .1);
+  }
+
+  function energyUp() {
+    energyN++;
+    energy.setAttribute('visible', true);
+    energy.setAttribute('geometry', 'thetaLength', Math.max(1, Math.min(360, 360 * energyN / COINS.length)));
+  }
+
   function onTap(h) {
     buzz();
     if (h.kind === 'coin') return collectCoin(h);
@@ -345,64 +411,148 @@
       return;
     }
     if (h.kind === 'egg') {
-      showPanel(h.tag, h.title, h.body, true);
-      if (!eggOpened) {
-        eggOpened = true;
-        const pop = $('slot-egg').pop;
-        pop.setAttribute('animation__open', 'property: scale; from: 1 1 1; to: 1.6 1.6 1.6; dir: alternate; dur: 380; loop: 2; easing: easeOutQuad');
-        burst($('slot-egg'), ['#ffd23c', '#ffffff', '#ff2d95'], 40); fanfare();
-        checkPerfect();
-      }
+      if (finaleBusy) return;
+      eggOpened = true;
+      playFinale(coins === COINS.length);
       return;
     }
     showPanel(h.tag, h.title, h.body);
     if (h.id === 'face') burst($('slot-face'), ['#27e1ff', '#ffffff'], 22);
     if (h.kind === 'key' && !found.has(h.id)) {
       found.add(h.id);
-      $('keyCount').textContent = found.size + ' / 2';
+      $('keyCount').textContent = found.size + ' / 2'; bump('keyCount');
       $('ring-' + h.id).setAttribute('material', 'color', '#ffffff');
-      if (found.size === 2) unlockEgg(); else toast('Key collected!');
+      toast(found.size === 2 ? 'Both keys sent to the Egg!' : 'Key sent to the Egg!');
+      const slot = $('slot-' + h.id);
+      flyToEgg(slot, slot.pop, 1100, () => {
+        eggHit(h.color); tone([660, 880, 1175], 0.1, 0.07, 'triangle', 0.07);
+        if (++keysArrived === 2) unlockEgg();
+      });
     }
   }
 
   function collectCoin(h) {
-    coinSfx();
-    coins++;
-    $('coinCount').textContent = coins + ' / ' + COINS.length;
-    // remove hit-disc immediately so it can't be tapped twice, then fly the coin up
-    const hit = Array.from(h.slot.children).find(c => c.hotspot === h);
+    coinSfx(); coins++;
+    $('coinCount').textContent = coins + ' / ' + COINS.length; bump('coinCount');
+    const hit = Array.from(h.slot.children).find(c => c.hotspot === h);   // can't be tapped twice
     if (hit) hit.remove();
-    h.pop.removeAttribute('animation__bob');
-    h.pop.setAttribute('animation__up', 'property: position; to: 0 .1 .32; dur: 420; easing: easeOutQuad');
-    h.pop.setAttribute('animation__shrink', 'property: scale; from: 1 1 1; to: 0 0 0; delay: 150; dur: 320');
-    burst(h.slot, ['#ffd23c', '#ffffff'], 8);
-    setTimeout(() => h.slot.remove(), 700);
-    if (coins === COINS.length) { toast('All coins collected!'); fanfare(); }
-    checkPerfect();
+    burst(h.slot, ['#ffd23c', '#ffffff'], 6);
+    flyToEgg(h.slot, h.pop, 850, () => {
+      eggHit('#ffd23c'); coinSfx(); energyUp();
+      h.slot.remove();
+      if (coins === COINS.length) {
+        toast('All coins collected! The Egg is fully charged');
+        if (eggOpened && !perfectShown && !finaleBusy) playFinale(true);
+      }
+    });
   }
 
   function unlockEgg() {
     eggUnlocked = true;
-    setTimeout(() => {
-      fanfare(); toast('Both keys found. The Egg is unlocked!');
-      const mesh = $('eggMesh');
-      mesh.setAttribute('material', 'color', '#ffd23c');
-      mesh.setAttribute('material', 'emissive', '#ffb300');
-      mesh.setAttribute('material', 'emissiveIntensity', 0.9);
-      $('ring-egg').setAttribute('material', 'color', '#ffd23c');
-      burst($('slot-egg'));
-    }, 600);
+    fanfare(); toast('Both keys found. The Egg is unlocked!');
+    const mesh = $('eggMesh');
+    mesh.setAttribute('material', 'color', '#ffd23c');
+    mesh.setAttribute('material', 'emissive', '#ffb300');
+    mesh.setAttribute('material', 'emissiveIntensity', 0.9);
+    $('ring-egg').setAttribute('material', 'color', '#ffd23c');
+    burst($('slot-egg')); shock($('slot-egg'), '#ffffff', 10, 800, .1);
   }
 
-  function checkPerfect() {
-    if (perfectShown || found.size < 2 || coins < COINS.length || !eggOpened) return;
-    perfectShown = true;
+  // ---------- Grand finale: the Egg cracks open ----------
+  function makeHolo(id, text, c1, c2) {
+    const c = document.createElement('canvas'); c.id = id; c.width = 768; c.height = 192; c.style.display = 'none';
+    const g = c.getContext('2d'); g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = '800 86px system-ui, Arial, sans-serif';
+    g.shadowColor = c1; g.shadowBlur = 38; g.fillStyle = '#fff'; g.fillText(text, 384, 100);
+    g.shadowColor = c2; g.shadowBlur = 18; g.strokeStyle = c2; g.lineWidth = 3; g.strokeText(text, 384, 100);
+    g.shadowBlur = 0; g.fillStyle = '#fff'; g.fillText(text, 384, 100);
+    document.body.appendChild(c);
+  }
+  function showBanner(t1, t2) {
+    $('b1').textContent = t1; $('b2').textContent = t2;
+    const b = $('banner'); b.classList.remove('go'); void b.offsetWidth; b.classList.add('go');
+  }
+  function goldFlash() {
+    const f = $('flash'); f.style.background = '#ffe27a';
+    f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
+    setTimeout(() => { f.style.background = ''; }, 700);
+  }
+
+  function playFinale(perfect) {
+    if (finaleBusy) return;
+    finaleBusy = true; if (perfect) perfectShown = true;
+    const slot = $('slot-egg'), r = root(), H2 = ASPECT / 2;
+    slot.pop.setAttribute('visible', false);
+    const fin = ce('a-entity', { position: '0 0 .14' }, slot);
+
+    // two shell halves + glowing core + light rays
+    const goldMat = 'flatShading: true; color: #ffd23c; emissive: #ffb300; emissiveIntensity: .8; metalness: .4; roughness: .35; side: double';
+    const top = ce('a-sphere', { radius: .055, 'segments-width': 10, 'segments-height': 6, scale: '1 1.3 1', 'theta-start': 0, 'theta-length': 90, material: goldMat }, fin);
+    const bot = ce('a-sphere', { radius: .055, 'segments-width': 10, 'segments-height': 6, scale: '1 1.3 1', 'theta-start': 90, 'theta-length': 90, material: goldMat }, fin);
+
+    const core = ce('a-entity', { scale: '0.01 0.01 0.01', position: '0 0 .01' }, fin);
+    ce('a-icosahedron', { radius: .034, material: 'flatShading: true; color: #fff3b0; emissive: #ffd23c; emissiveIntensity: 1' }, core);
+    ce('a-sphere', { radius: .09, 'segments-width': 12, 'segments-height': 8, material: ADD('#ffd23c', .35) }, core);
+    core.setAttribute('animation__in', 'property: scale; from: .01 .01 .01; to: 1 1 1; dur: 600; delay: 900; easing: easeOutBack');
+    core.setAttribute('animation__spin', 'property: rotation; to: 0 360 0; dur: 3000; easing: linear; loop: true');
+
+    const rays = ce('a-entity', { scale: '0.01 0.01 0.01', position: '0 0 -.02' }, fin);
+    for (let i = 0; i < 14; i++) {
+      const arm = ce('a-entity', { rotation: `0 0 ${i * (360 / 14)}` }, rays);
+      ce('a-plane', { width: i % 2 ? .012 : .022, height: .55, position: '0 .28 0', material: ADD(i % 2 ? '#ff2d95' : '#ffd23c', .42) }, arm);
+    }
+    rays.setAttribute('animation__in', 'property: scale; from: .01 .01 .01; to: 1 1 1; dur: 700; delay: 900; easing: easeOutBack');
+    rays.setAttribute('animation__rot', 'property: rotation; to: 0 0 360; dur: 7000; easing: linear; loop: true');
+
+    // hologram title
+    const holo = ce('a-plane', { width: .92, height: .23, position: '0 -.3 .26', scale: '0.01 0.01 0.01',
+      material: `shader: flat; src: #${perfect ? 'holoPerfect' : 'holoWin'}; transparent: true; side: double; depthWrite: false` }, slot);
+    holo.setAttribute('animation__in', 'property: scale; from: .01 .01 .01; to: 1 1 1; dur: 600; delay: 1200; easing: easeOutBack');
+    holo.setAttribute('animation__out', 'property: scale; to: .01 .01 .01; dur: 400; delay: 5700; easing: easeInQuad');
+
+    // t=0: the egg shakes and a rising whoosh plays
+    fin.setAttribute('animation__shake', 'property: rotation; from: 0 0 -9; to: 0 0 9; dir: alternate; dur: 65; loop: 13; easing: linear');
+    sweep();
+
+    // t=0.9s: it cracks open
     setTimeout(() => {
-      fanfare(); toast('PERFECT RUN!');
-      showPanel('Achievement unlocked', 'Player One Ready',
-        'Both keys, every coin and the Easter Egg. You have beaten the poster. Snap a photo to prove it!', true);
-      burst($('slot-egg'), ['#ffd23c', '#ff2d95', '#27e1ff', '#ffffff'], 50);
+      fin.removeAttribute('animation__shake'); fin.setAttribute('rotation', '0 0 0');
+      top.setAttribute('animation__o', 'property: position; to: 0 .1 .05; dur: 700; easing: easeOutBack');
+      top.setAttribute('animation__r', 'property: rotation; to: 0 0 -40; dur: 700; easing: easeOutQuad');
+      bot.setAttribute('animation__o', 'property: position; to: 0 -.045 0; dur: 700; easing: easeOutQuad');
+      bot.setAttribute('animation__r', 'property: rotation; to: 0 0 12; dur: 700; easing: easeOutQuad');
+      victory(); goldFlash();
+      showBanner(perfect ? 'Perfect Run!' : 'Easter Egg Found!',
+                 perfect ? 'Every key, every coin, the Egg. You are Player One.' : (coins < COINS.length ? 'Collect every coin for a perfect run' : 'You found Halliday’s prize'));
+      shock(slot, '#ffffff', 16, 1000, .15);
+      setTimeout(() => shock(slot, '#ffd23c', 20, 1100, .15), 220);
+      setTimeout(() => shock(slot, '#ff2d95', 24, 1200, .15), 440);
+      burst(slot, ['#ffd23c', '#ff2d95', '#27e1ff', '#ffffff'], 46);
     }, 900);
+
+    // confetti rains down across the whole poster
+    const colors = ['#ffd23c', '#ff2d95', '#27e1ff', '#ffffff', '#7b2cff', '#2fe36b'];
+    const N = perfect ? 120 : 70;
+    for (let i = 0; i < N; i++) {
+      const x = rnd(-.5, .5), z = rnd(.06, .3), dur = Math.round(rnd(2600, 4600)), delay = 900 + Math.round(rnd(0, 1400));
+      const c = ce('a-plane', { width: rnd(.014, .028), height: rnd(.008, .016), position: `${x} ${H2 + .1} ${z}`, visible: 'false',
+        material: `shader: flat; color: ${colors[i % colors.length]}; side: double` }, r);
+      setTimeout(() => c.setAttribute('visible', true), delay);
+      c.setAttribute('animation__fall', `property: position; to: ${x + rnd(-.12, .12)} ${-H2 - .1} ${z}; dur: ${dur}; delay: ${delay}; easing: linear`);
+      c.setAttribute('animation__flip', `property: rotation; from: 0 0 0; to: ${Math.round(rnd(360, 1080))} ${Math.round(rnd(360, 1080))} ${Math.round(rnd(0, 360))}; dur: ${dur}; delay: ${delay}; easing: linear`);
+      setTimeout(() => c.remove(), delay + dur + 200);
+    }
+
+    // wrap up: restore the (now golden) egg, show the panel, allow replay
+    setTimeout(() => {
+      fin.remove(); holo.remove();
+      slot.pop.setAttribute('visible', true);
+      finaleBusy = false;
+      if (perfect) showPanel('Achievement unlocked', 'Player One Ready',
+        'Both keys, every coin and the Easter Egg. You have beaten the poster. Snap a photo to prove it! Tap the Egg to replay the finale.', true);
+      else showPanel(BY_ID.egg.tag, BY_ID.egg.title, BY_ID.egg.body + ' Tap the Egg again to replay the finale.', true);
+      if (coins === COINS.length && !perfectShown && eggOpened) setTimeout(() => playFinale(true), 1200);
+    }, 6600);
   }
 
   // ---------- Guided tour (Dynamic Motion) ----------
@@ -492,7 +642,7 @@
     const beat = Math.exp(-(ct % BEAT) * 7);               // 1 on the kick, decays to ~0
     const wob = 1 + 0.08 * Math.sin(t * 3);
     rings.forEach((r, i) => r.object3D.scale.setScalar(wob + beat * 0.26));
-    borders.forEach(b => { const m = b.getObject3D('mesh'); if (m) m.material.opacity = .3 + beat * .6; });
+    borders.forEach(b => { const m = b.getObject3D('mesh'); if (m) { m.material.opacity = .3 + beat * .6; m.material.color.set(eggOpened ? '#ffd23c' : '#ff2d95'); } });
     if (halo) { const m = halo.getObject3D('mesh'); if (m) m.material.opacity = eggUnlocked ? .18 + beat * .5 : .04; }
     if (visor) { visor.object3D.rotation.z = t * 1.3; visor.object3D.scale.setScalar(1 + beat * .08); }
   }
@@ -519,6 +669,8 @@
   };
 
   function boot() {
+    makeHolo('holoWin', 'PLAYER ONE', '#ffd23c', '#ff2d95');
+    makeHolo('holoPerfect', 'PERFECT RUN', '#27e1ff', '#ffd23c');
     build();
     sceneEl.canvas.addEventListener('pointerup', onPointerUp);
     requestAnimationFrame(frame);
@@ -538,7 +690,7 @@
   }
   if (sceneEl.hasLoaded) boot(); else sceneEl.addEventListener('loaded', boot);
 
-  window.__ar = { onTap, HOTSPOTS, makeSnap, startTour, stopTour };   // handy for testing
+  window.__ar = { onTap, HOTSPOTS, makeSnap, startTour, stopTour, playFinale };   // handy for testing
 })();
 </script>
 </body>
