@@ -7,9 +7,9 @@
 <script src="vendor/aframe-v1.5.0.min.js"></script>
 <script src="vendor/mindar-image-aframe.prod.js"></script>
 <style>
-  :root{--pink:#ff2d95;--cyan:#27e1ff;--ink:#0b0720;--glass:rgba(14,8,40,.82)}
+  :root{--pink:#ff2d95;--cyan:#27e1ff;--gold:#ffd23c;--ink:#0b0720;--glass:rgba(14,8,40,.82)}
   *{box-sizing:border-box}
-  html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#fff}
+  html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#fff;-webkit-tap-highlight-color:transparent}
   a-scene{position:fixed;inset:0}
   .hidden{display:none!important}
 
@@ -19,6 +19,8 @@
   #start h1{margin:0;font-size:clamp(34px,9vw,56px);line-height:1;letter-spacing:.04em;text-transform:uppercase;
     color:#fff;text-shadow:0 0 12px var(--pink),0 0 28px var(--pink),0 0 48px #7b2cff}
   #start p{margin:0;max-width:34ch;opacity:.85;line-height:1.5}
+  #start ul{margin:0;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:36ch}
+  #start li{font-size:12px;letter-spacing:.06em;padding:6px 11px;border-radius:999px;border:1px solid rgba(255,255,255,.22);background:rgba(255,255,255,.06)}
   .btn{appearance:none;border:2px solid var(--cyan);background:transparent;color:var(--cyan);font:700 16px/1 inherit;letter-spacing:.12em;text-transform:uppercase;
     padding:16px 30px;border-radius:999px;box-shadow:0 0 18px rgba(39,225,255,.45),inset 0 0 14px rgba(39,225,255,.2);cursor:pointer}
   .btn:active{transform:scale(.97)}
@@ -30,27 +32,36 @@
   #scan .msg{position:relative;background:var(--glass);border:1px solid rgba(255,255,255,.18);padding:10px 16px;border-radius:999px;font-size:14px}
 
   /* HUD */
-  #hud{position:fixed;top:0;left:0;right:0;z-index:30;display:flex;justify-content:space-between;align-items:center;padding:max(12px,env(safe-area-inset-top)) 14px 10px;pointer-events:none}
+  #hud{position:fixed;top:0;left:0;right:0;z-index:30;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:max(12px,env(safe-area-inset-top)) 12px 10px;pointer-events:none}
   #hud>*{pointer-events:auto}
-  .chip{background:var(--glass);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:8px 14px;font-size:13px;letter-spacing:.05em;display:flex;gap:8px;align-items:center}
+  .chip{background:var(--glass);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:8px 12px;font-size:12.5px;letter-spacing:.04em;display:flex;gap:6px;align-items:center;white-space:nowrap;user-select:none}
   .chip b{color:var(--cyan)}
-  #mute{width:42px;height:38px;justify-content:center;padding:0;cursor:pointer;font-size:17px}
+  .sep{width:1px;height:14px;background:rgba(255,255,255,.25);margin:0 2px}
+  .btns{display:flex;gap:6px}
+  .ibtn{cursor:pointer;justify-content:center;min-width:40px;height:36px;padding:0 11px;font-size:15px}
+  .ibtn:active{transform:scale(.94)}
+  #tourBtn{font-size:12.5px;font-weight:700;color:var(--cyan);border-color:rgba(39,225,255,.55)}
+  #tourBtn.on{color:#fff;background:linear-gradient(90deg,var(--pink),#7b2cff);border-color:transparent}
 
   /* Info panel */
   #panel{position:fixed;left:0;right:0;bottom:0;z-index:40;transform:translateY(105%);transition:transform .28s ease;padding:0 12px max(14px,env(safe-area-inset-bottom))}
   #panel.open{transform:none}
-  #panel .card{max-width:560px;margin:0 auto;background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  #panel .card{position:relative;max-width:560px;margin:0 auto;background:var(--glass);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
     border:1px solid var(--pink);border-radius:18px;padding:16px 18px 18px;box-shadow:0 0 24px rgba(255,45,149,.35)}
+  #panel.gold .card{border-color:var(--gold);box-shadow:0 0 28px rgba(255,210,60,.45)}
   #panel .tag{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--cyan)}
-  #panel h2{margin:4px 0 8px;font-size:21px}
+  #panel.gold .tag{color:var(--gold)}
+  #panel h2{margin:4px 0 8px;font-size:21px;padding-right:30px}
   #panel p{margin:0;line-height:1.5;font-size:15px;opacity:.92}
-  #panel .close{position:absolute;right:26px;top:10px;background:none;border:0;color:#fff;font-size:26px;line-height:1;padding:6px;cursor:pointer}
+  #panel .close{position:absolute;right:10px;top:6px;background:none;border:0;color:#fff;font-size:26px;line-height:1;padding:6px;cursor:pointer}
 
-  /* Toast */
-  #toast{position:fixed;left:50%;top:70px;transform:translate(-50%,-20px);opacity:0;z-index:45;background:linear-gradient(90deg,var(--pink),#7b2cff);padding:10px 18px;border-radius:999px;font-weight:700;font-size:14px;transition:.3s;pointer-events:none;white-space:nowrap}
+  /* Toast + flash */
+  #toast{position:fixed;left:50%;top:max(64px,calc(env(safe-area-inset-top) + 56px));transform:translate(-50%,-20px);opacity:0;z-index:45;background:linear-gradient(90deg,var(--pink),#7b2cff);padding:10px 18px;border-radius:999px;font-weight:700;font-size:14px;transition:.3s;pointer-events:none;white-space:nowrap;max-width:94vw;overflow:hidden;text-overflow:ellipsis}
   #toast.show{opacity:1;transform:translate(-50%,0)}
+  #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:60}
+  #flash.go{animation:fl .45s ease-out}
+  @keyframes fl{0%{opacity:.85}100%{opacity:0}}
 
-  /* Hide MindAR built-in overlays we replaced */
   .mindar-ui-overlay.mindar-ui-scanning,.mindar-ui-overlay.mindar-ui-loading{display:none!important}
 </style>
 </head>
@@ -58,7 +69,8 @@
 
 <div id="start">
   <h1>Ready<br>Player<br>One</h1>
-  <p>Point your camera at the poster to unlock the OASIS. Find both keys, then crack open the Egg.</p>
+  <p>Point your camera at the poster to unlock the OASIS.</p>
+  <ul><li>🔑 Find 2 keys</li><li>🪙 Grab 9 coins</li><li>🥚 Crack the Egg</li><li>▶ Guided tour</li><li>📸 Snap a photo</li></ul>
   <button id="startBtn" class="btn">Enter the OASIS</button>
   <small>Camera access is needed to track the poster. Sound on for the full experience.</small>
 </div>
@@ -66,11 +78,16 @@
 <div id="scan" class="hidden"><div class="box"></div><div class="msg">Aim at the full poster and hold steady</div></div>
 
 <div id="hud" class="hidden">
-  <div class="chip">🔑 Keys <b id="keyCount">0 / 2</b></div>
-  <div id="mute" class="chip" title="Sound on/off" role="button" aria-label="Toggle sound">🔊</div>
+  <div class="chip" aria-label="Progress">🔑 <b id="keyCount">0 / 2</b><span class="sep"></span>🪙 <b id="coinCount">0 / 9</b></div>
+  <div class="btns">
+    <div id="tourBtn" class="chip ibtn" role="button" aria-label="Guided tour">▶ Tour</div>
+    <div id="snapBtn" class="chip ibtn" role="button" aria-label="Take photo">📸</div>
+    <div id="mute" class="chip ibtn" role="button" aria-label="Toggle sound">🔊</div>
+  </div>
 </div>
 
 <div id="toast"></div>
+<div id="flash"></div>
 
 <div id="panel" aria-live="polite">
   <div class="card">
@@ -85,7 +102,7 @@
 
 <a-scene
   mindar-image="imageTargetSrc: assets/poster.mind; autoStart: false; maxTrack: 1; uiLoading: no; uiScanning: no; uiError: yes; filterMinCF: 0.0005; filterBeta: 200; warmupTolerance: 4; missTolerance: 8;"
-  color-space="sRGB" renderer="colorManagement: true; physicallyCorrectLights: false; antialias: true; alpha: true"
+  color-space="sRGB" renderer="colorManagement: true; antialias: true; alpha: true"
   vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false" embedded>
 
   <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
@@ -128,12 +145,23 @@
       title:'March 29 · IMAX',
       body:'Directed by Steven Spielberg from Ernest Cline’s novel, with music by Alan Silvestri. The poster promotes the March 29, 2018 release, advertising it as bigger in IMAX.' }
   ];
+  const BY_ID = Object.fromEntries(HOTSPOTS.map(h => [h.id, h]));
+  const TOUR_ORDER = ['face', 'jade', 'copper', 'giant', 'imax', 'egg'];
+
+  // Coins: px,py positions on the poster
+  const COINS = [[120,520],[610,520],[62,430],[690,430],[210,1000],[520,1000],[120,900],[630,900],[363,548]];
+
+  const BPM = 100, BEAT = 60 / BPM;   // matches assets/loop.mp3 (kick on every beat)
 
   // ---------- State ----------
   const found = new Set();
-  let eggUnlocked = false, muted = false, started = false;
+  let coins = 0, eggUnlocked = false, eggOpened = false, perfectShown = false;
+  let muted = false, tracking = false;
   const $ = id => document.getElementById(id);
   const root = () => $('scene-root');
+  const rings = [], borders = [];
+  let visor, halo, spot;
+  const buzz = () => { try { navigator.vibrate && navigator.vibrate(14); } catch (e) {} };
 
   // ---------- Tiny WebAudio sfx ----------
   let ac;
@@ -149,7 +177,8 @@
       });
     } catch (e) {}
   }
-  const blip = () => tone([880, 1320], 0.08, 0.06);
+  const blip    = () => tone([880, 1320], 0.08, 0.06);
+  const coinSfx = () => tone([988, 1319], 0.09, 0.06, 'square', 0.05);
   const fanfare = () => tone([523, 659, 784, 1047, 1319], 0.22, 0.11, 'triangle', 0.09);
 
   // ---------- Build the AR content ----------
@@ -159,6 +188,8 @@
     if (parent) parent.appendChild(el);
     return el;
   };
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const ADD = (color, op) => `shader: flat; color: ${color}; opacity: ${op}; transparent: true; blending: additive; depthWrite: false`;
 
   function lowPolyKey(color, parent) {
     const g = ce('a-entity', { rotation: '0 0 0' }, parent);
@@ -173,35 +204,61 @@
 
   function lowPolyEgg(parent) {
     const g = ce('a-entity', {}, parent);
-    const egg = ce('a-sphere', { radius: .055, 'segments-width': 8, 'segments-height': 6, scale: '1 1.3 1',
+    ce('a-sphere', { id: 'eggMesh', radius: .055, 'segments-width': 8, 'segments-height': 6, scale: '1 1.3 1',
       material: 'flatShading: true; color: #6b6b7a; emissive: #000; metalness: .6; roughness: .35' }, g);
-    egg.id = 'eggMesh';
     ce('a-sphere', { radius: .06, 'segments-width': 8, 'segments-height': 6, scale: '1 1.3 1',
       material: 'wireframe: true; color: #ffd23c; opacity: .55; transparent: true' }, g);
     return g;
   }
 
+  function lowPolyCoin(parent) {
+    const g = ce('a-entity', {}, parent);
+    const face = { 'segments-radial': 8, rotation: '90 0 0' };
+    ce('a-cylinder', Object.assign({ radius: .024, height: .006, material: 'flatShading: true; color: #ffc928; emissive: #ff9d00; emissiveIntensity: .35; metalness: .7; roughness: .3' }, face), g);
+    ce('a-cylinder', Object.assign({ radius: .014, height: .009, material: 'flatShading: true; color: #ffe27a; emissive: #ffb300; emissiveIntensity: .3' }, face), g);
+    return g;
+  }
+
   function build() {
     const r = root();
+    const H2 = ASPECT / 2;
 
-    // Living canvas: a neon scan-line sweeping over the poster (additive glow)
-    const bar = ce('a-plane', { width: 1, height: .035, position: `0 ${-ASPECT/2} .004`,
-      material: 'shader: flat; color: #27e1ff; opacity: .28; transparent: true; blending: additive; depthWrite: false' }, r);
-    bar.setAttribute('animation', `property: position; from: 0 ${-ASPECT/2} .004; to: 0 ${ASPECT/2} .004; dur: 5200; easing: linear; loop: true`);
+    // Neon border (pulses with the beat)
+    [[1, .012, 0, H2], [1, .012, 0, -H2], [.012, ASPECT, -.5, 0], [.012, ASPECT, .5, 0]].forEach(([w, h, x, y]) => {
+      borders.push(ce('a-plane', { width: w, height: h, position: `${x} ${y} .006`, material: ADD('#ff2d95', .5) }, r));
+    });
 
-    // Soft pulsing glow halo behind the egg position
-    const egg = HOTSPOTS.find(h => h.kind === 'egg');
-    const halo = ce('a-circle', { radius: .16, position: `${toX(egg.px)} ${toY(egg.py)} .01`,
-      material: 'shader: flat; color: #ffd23c; opacity: .0; transparent: true; blending: additive; depthWrite: false' }, r);
-    halo.id = 'eggHalo';
+    // Living canvas: neon scan-line sweeping over the poster
+    const bar = ce('a-plane', { width: 1, height: .035, position: `0 ${-H2} .004`, material: ADD('#27e1ff', .28) }, r);
+    bar.setAttribute('animation', `property: position; from: 0 ${-H2} .004; to: 0 ${H2} .004; dur: 5200; easing: linear; loop: true`);
 
+    // Ambient sparkles drifting above the poster
+    for (let i = 0; i < 30; i++) {
+      const x = rnd(-.48, .48), y = rnd(-H2 + .05, H2 - .05), z = rnd(.04, .26);
+      const s = ce('a-octahedron', { radius: rnd(.004, .009), position: `${x} ${y} ${z}`,
+        material: ADD(['#ffffff', '#27e1ff', '#ff2d95', '#ffd23c'][i % 4], .85) }, r);
+      s.setAttribute('animation', `property: position; to: ${x + rnd(-.04, .04)} ${y + rnd(.08, .2)} ${z + .05}; dir: alternate; dur: ${Math.round(rnd(2200, 4800))}; delay: ${Math.round(rnd(0, 2000))}; easing: easeInOutSine; loop: true`);
+      s.setAttribute('animation__spin', `property: rotation; to: 0 360 0; dur: ${Math.round(rnd(2500, 5000))}; easing: linear; loop: true`);
+    }
+
+    // Egg glow halo
+    const egg = BY_ID.egg;
+    halo = ce('a-circle', { radius: .16, position: `${toX(egg.px)} ${toY(egg.py)} .01`, material: ADD('#ffd23c', 0.05) }, r);
+
+    // Guided-tour spotlight (hidden until the tour runs)
+    spot = ce('a-entity', { visible: 'false', position: `0 0 .015` }, r);
+    ce('a-circle', { radius: .17, material: ADD('#27e1ff', .2) }, spot);
+    ce('a-ring', { 'radius-inner': .165, 'radius-outer': .178, 'segments-theta': 40,
+      material: 'shader: flat; color: #ffffff; opacity: .9; transparent: true; side: double' }, spot);
+
+    // Hotspots
     HOTSPOTS.forEach(h => {
       const x = toX(h.px), y = toY(h.py);
       const slot = ce('a-entity', { position: `${x} ${y} 0`, id: 'slot-' + h.id }, r);
 
-      // 3D pop-out, floating above the poster surface
       const floatY = h.kind === 'key' ? .13 : .12;
       const pop = ce('a-entity', { position: `0 0 ${floatY}` }, slot);
+      slot.pop = pop;
       if (h.kind === 'key') {
         const k = lowPolyKey(h.color, pop);
         k.setAttribute('animation__spin', 'property: rotation; to: 0 360 0; dur: 5000; easing: linear; loop: true');
@@ -212,11 +269,9 @@
         pop.setAttribute('animation__bob', `property: position; from: 0 0 ${floatY}; to: 0 .015 ${floatY + .03}; dir: alternate; dur: 1800; easing: easeInOutSine; loop: true`);
       }
 
-      // Hotspot ring (visual) + larger invisible hit target (easy to tap)
       const ring = ce('a-ring', { 'radius-inner': .045, 'radius-outer': .056, 'segments-theta': 24, position: '0 0 .02',
         material: `shader: flat; color: ${h.kind === 'egg' ? '#8a8a99' : h.color}; opacity: .95; transparent: true; side: double` }, slot);
-      ring.id = 'ring-' + h.id;
-      ring.setAttribute('animation', 'property: scale; from: 1 1 1; to: 1.3 1.3 1.3; dir: alternate; dur: 900; easing: easeInOutSine; loop: true');
+      ring.id = 'ring-' + h.id; rings.push(ring);
       ce('a-circle', { radius: .045, position: '0 0 .018',
         material: `shader: flat; color: ${h.color}; opacity: .22; transparent: true; side: double` }, slot);
 
@@ -224,11 +279,30 @@
         material: 'shader: flat; opacity: 0; transparent: true; side: double; depthWrite: false' }, slot);
       hit.hotspot = h;
     });
+
+    // Visor-scan HUD ring around Parzival
+    const fs = $('slot-face');
+    visor = ce('a-entity', { position: '0 0 .035' }, fs);
+    ce('a-ring', { 'radius-inner': .13, 'radius-outer': .14, 'segments-theta': 36, 'theta-length': 250, material: ADD('#27e1ff', .85) }, visor);
+    ce('a-ring', { 'radius-inner': .15, 'radius-outer': .155, 'segments-theta': 24, 'theta-length': 90, rotation: '0 0 180', material: ADD('#ff2d95', .8) }, visor);
+
+    // Coins
+    COINS.forEach(([px, py], i) => {
+      const slot = ce('a-entity', { position: `${toX(px)} ${toY(py)} 0` }, r);
+      const pop = ce('a-entity', { position: '0 0 .09' }, slot);
+      const c = lowPolyCoin(pop);
+      c.setAttribute('animation__spin', `property: rotation; to: 0 360 0; dur: ${1700 + (i % 3) * 250}; easing: linear; loop: true`);
+      pop.setAttribute('animation__bob', `property: position; from: 0 0 .085; to: 0 0 .12; dir: alternate; dur: ${1100 + (i % 4) * 150}; delay: ${i * 120}; easing: easeInOutSine; loop: true`);
+      const hit = ce('a-circle', { radius: .065, position: '0 0 .03', class: 'clickable',
+        material: 'shader: flat; opacity: 0; transparent: true; side: double; depthWrite: false' }, slot);
+      hit.hotspot = { id: 'coin' + i, kind: 'coin', slot, pop };
+    });
   }
 
-  // ---------- Interaction ----------
-  function showPanel(tag, title, body) {
+  // ---------- Panels / toast ----------
+  function showPanel(tag, title, body, gold) {
     $('pTag').textContent = tag; $('pTitle').textContent = title; $('pBody').textContent = body;
+    $('panel').classList.toggle('gold', !!gold);
     $('panel').classList.add('open');
   }
   $('closePanel').onclick = () => $('panel').classList.remove('open');
@@ -239,19 +313,62 @@
     clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600);
   }
 
+  // ---------- Particle burst ----------
+  function burst(parent, colors = ['#ffd23c', '#ff2d95'], n = 28) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, d = .12 + Math.random() * .2, z = .12 + Math.random() * .15;
+      const p = ce('a-tetrahedron', { radius: .008 + Math.random() * .008, position: '0 0 .12',
+        material: `shader: flat; color: ${colors[i % colors.length]}` }, parent);
+      p.setAttribute('animation__m', `property: position; to: ${Math.cos(a) * d} ${Math.sin(a) * d} ${z}; dur: 900; easing: easeOutQuad`);
+      p.setAttribute('animation__s', 'property: scale; from: 1 1 1; to: 0 0 0; delay: 500; dur: 600');
+      setTimeout(() => p.remove(), 1300);
+    }
+  }
+
+  // ---------- Interaction ----------
   function onTap(h) {
+    buzz();
+    if (h.kind === 'coin') return collectCoin(h);
     blip();
     if (h.kind === 'egg' && !eggUnlocked) {
       showPanel('Locked', 'The Egg is sealed', 'Find and collect both keys on the poster first. Tap the glowing rings.');
       return;
     }
+    if (h.kind === 'egg') {
+      showPanel(h.tag, h.title, h.body, true);
+      if (!eggOpened) {
+        eggOpened = true;
+        const pop = $('slot-egg').pop;
+        pop.setAttribute('animation__open', 'property: scale; from: 1 1 1; to: 1.6 1.6 1.6; dir: alternate; dur: 380; loop: 2; easing: easeOutQuad');
+        burst($('slot-egg'), ['#ffd23c', '#ffffff', '#ff2d95'], 40); fanfare();
+        checkPerfect();
+      }
+      return;
+    }
     showPanel(h.tag, h.title, h.body);
+    if (h.id === 'face') burst($('slot-face'), ['#27e1ff', '#ffffff'], 22);
     if (h.kind === 'key' && !found.has(h.id)) {
       found.add(h.id);
       $('keyCount').textContent = found.size + ' / 2';
-      const ring = $('ring-' + h.id); ring.setAttribute('material', 'color', '#ffffff');
+      $('ring-' + h.id).setAttribute('material', 'color', '#ffffff');
       if (found.size === 2) unlockEgg(); else toast('Key collected!');
     }
+  }
+
+  function collectCoin(h) {
+    coinSfx();
+    coins++;
+    $('coinCount').textContent = coins + ' / ' + COINS.length;
+    // remove hit-disc immediately so it can't be tapped twice, then fly the coin up
+    const hit = Array.from(h.slot.children).find(c => c.hotspot === h);
+    if (hit) hit.remove();
+    h.pop.removeAttribute('animation__bob');
+    h.pop.setAttribute('animation__up', 'property: position; to: 0 .1 .32; dur: 420; easing: easeOutQuad');
+    h.pop.setAttribute('animation__shrink', 'property: scale; from: 1 1 1; to: 0 0 0; delay: 150; dur: 320');
+    burst(h.slot, ['#ffd23c', '#ffffff'], 8);
+    setTimeout(() => h.slot.remove(), 700);
+    if (coins === COINS.length) { toast('All coins collected!'); fanfare(); }
+    checkPerfect();
   }
 
   function unlockEgg() {
@@ -263,50 +380,87 @@
       mesh.setAttribute('material', 'emissive', '#ffb300');
       mesh.setAttribute('material', 'emissiveIntensity', 0.9);
       $('ring-egg').setAttribute('material', 'color', '#ffd23c');
-      const halo = $('eggHalo');
-      halo.setAttribute('animation', 'property: material.opacity; from: .05; to: .5; dir: alternate; dur: 900; easing: easeInOutSine; loop: true');
       burst($('slot-egg'));
     }, 600);
   }
 
-  function burst(parent) {
-    for (let i = 0; i < 28; i++) {
-      const a = Math.random() * Math.PI * 2, d = .12 + Math.random() * .2, z = .12 + Math.random() * .15;
-      const p = ce('a-tetrahedron', { radius: .008 + Math.random() * .008, position: `0 0 .12`,
-        material: `shader: flat; color: ${i % 2 ? '#ffd23c' : '#ff2d95'}` }, parent);
-      p.setAttribute('animation__m', `property: position; to: ${Math.cos(a) * d} ${Math.sin(a) * d} ${z}; dur: 900; easing: easeOutQuad`);
-      p.setAttribute('animation__s', 'property: scale; from: 1 1 1; to: 0 0 0; delay: 500; dur: 600');
-      setTimeout(() => p.remove(), 1300);
-    }
+  function checkPerfect() {
+    if (perfectShown || found.size < 2 || coins < COINS.length || !eggOpened) return;
+    perfectShown = true;
+    setTimeout(() => {
+      fanfare(); toast('PERFECT RUN!');
+      showPanel('Achievement unlocked', 'Player One Ready',
+        'Both keys, every coin and the Easter Egg. You have beaten the poster. Snap a photo to prove it!', true);
+      burst($('slot-egg'), ['#ffd23c', '#ff2d95', '#27e1ff', '#ffffff'], 50);
+    }, 900);
   }
 
-  // ---------- App flow ----------
-  const sceneEl = document.querySelector('a-scene');
-  const bgm = $('bgm');
-
-  function setMuted(m) {
-    muted = m; bgm.muted = m; $('mute').textContent = m ? '🔇' : '🔊';
+  // ---------- Guided tour (Dynamic Motion) ----------
+  let tourOn = false, tourTimer = null, tourIdx = 0;
+  function moveSpot(h) {
+    spot.setAttribute('visible', true);
+    spot.setAttribute('animation__move', `property: position; to: ${toX(h.px)} ${toY(h.py)} .015; dur: 900; easing: easeInOutCubic`);
   }
-  $('mute').onclick = () => setMuted(!muted);
+  function tourStep() {
+    if (!tourOn) return;
+    if (tourIdx >= TOUR_ORDER.length) { stopTour(true); return; }
+    const h = BY_ID[TOUR_ORDER[tourIdx++]];
+    if (h.kind === 'egg' && !eggUnlocked) { tourStep(); return; }
+    moveSpot(h); blip();
+    showPanel(h.tag, h.title, h.body, h.kind === 'egg');
+    tourTimer = setTimeout(tourStep, 5200);
+  }
+  function startTour() {
+    if (!tracking) { toast('Aim at the poster first'); return; }
+    tourOn = true; tourIdx = 0; $('tourBtn').textContent = '■ Stop'; $('tourBtn').classList.add('on');
+    tourStep();
+  }
+  function stopTour(done) {
+    tourOn = false; clearTimeout(tourTimer);
+    $('tourBtn').textContent = '▶ Tour'; $('tourBtn').classList.remove('on');
+    if (spot) spot.setAttribute('visible', false);
+    if (done) { $('panel').classList.remove('open'); toast('Tour complete. Now go grab those coins!'); }
+  }
+  $('tourBtn').onclick = () => (tourOn ? stopTour(false) : startTour());
 
-  $('startBtn').onclick = async () => {
-    // user gesture: unlock audio on iOS/Android, then start the camera + tracker
-    try { await bgm.play(); bgm.pause(); } catch (e) {}
-    try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); ac.resume(); } catch (e) {}
-    $('start').classList.add('hidden');
-    $('hud').classList.remove('hidden');
-    $('scan').classList.remove('hidden');
+  // ---------- Photo snap ----------
+  function makeSnap() {
     const sys = sceneEl.systems['mindar-image-system'];
-    started = true;
-    try { await sys.start(); } catch (e) {
-      $('start').classList.remove('hidden'); $('hud').classList.add('hidden'); $('scan').classList.add('hidden');
-      $('start').querySelector('p').textContent = 'Could not start the camera. Allow camera access and make sure the page is opened over HTTPS.';
+    const video = (sys && sys.video) || document.querySelector('video');
+    const canvas = sceneEl.canvas, cr = canvas.getBoundingClientRect();
+    sceneEl.renderer.render(sceneEl.object3D, sceneEl.camera);     // make sure the GL buffer is fresh
+    const out = document.createElement('canvas'); out.width = canvas.width; out.height = canvas.height;
+    const s = canvas.width / cr.width, c = out.getContext('2d');
+    c.fillStyle = '#000'; c.fillRect(0, 0, out.width, out.height);
+    if (video && video.videoWidth) {
+      const vr = video.getBoundingClientRect();
+      c.drawImage(video, (vr.left - cr.left) * s, (vr.top - cr.top) * s, vr.width * s, vr.height * s);
     }
-  };
+    c.drawImage(canvas, 0, 0);
+    c.font = `700 ${Math.round(out.width * 0.036)}px system-ui,sans-serif`;
+    c.textAlign = 'center'; c.fillStyle = '#fff'; c.shadowColor = '#ff2d95'; c.shadowBlur = 14;
+    c.fillText('READY PLAYER ONE · AR', out.width / 2, out.height - out.width * 0.05);
+    return out;
+  }
+  function snap() {
+    if (!tracking) { toast('Aim at the poster first'); return; }
+    let out;
+    try { out = makeSnap(); } catch (e) { toast('Could not capture photo'); return; }
+    const f = $('flash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
+    out.toBlob(async blob => {
+      if (!blob) return;
+      const file = new File([blob], 'ready-player-one-ar.png', { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: 'Ready Player One AR' }); return; }
+        catch (e) { if (e && e.name === 'AbortError') return; }
+      }
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = file.name;
+      document.body.appendChild(a); a.click(); a.remove(); toast('Photo saved');
+    }, 'image/png');
+  }
+  $('snapBtn').onclick = snap;
 
-  // Tap handling: raycast from the tap point into the hotspot hit-discs.
-  // (More reliable on phones than A-Frame's built-in cursor.)
-  let tracking = false;
+  // ---------- Tap handling (raycast from tap point into hit-discs) ----------
   const ray = new AFRAME.THREE.Raycaster();
   function onPointerUp(e) {
     if (!tracking) return;
@@ -319,17 +473,54 @@
     if (el && el.hotspot) onTap(el.hotspot);
   }
 
+  // ---------- Beat-synced visuals (kick lands on every beat of loop.mp3) ----------
+  function frame(ts) {
+    requestAnimationFrame(frame);
+    if (!tracking) return;
+    const t = ts / 1000;
+    const ct = (!bgm.paused && bgm.currentTime) ? bgm.currentTime : t;
+    const beat = Math.exp(-(ct % BEAT) * 7);               // 1 on the kick, decays to ~0
+    const wob = 1 + 0.08 * Math.sin(t * 3);
+    rings.forEach((r, i) => r.object3D.scale.setScalar(wob + beat * 0.26));
+    borders.forEach(b => { const m = b.getObject3D('mesh'); if (m) m.material.opacity = .3 + beat * .6; });
+    if (halo) { const m = halo.getObject3D('mesh'); if (m) m.material.opacity = eggUnlocked ? .18 + beat * .5 : .04; }
+    if (visor) { visor.object3D.rotation.z = t * 1.3; visor.object3D.scale.setScalar(1 + beat * .08); }
+  }
+
+  // ---------- App flow ----------
+  const sceneEl = document.querySelector('a-scene');
+  const bgm = $('bgm');
+  let toldHint = false;
+
+  function setMuted(m) { muted = m; bgm.muted = m; $('mute').textContent = m ? '🔇' : '🔊'; }
+  $('mute').onclick = () => setMuted(!muted);
+
+  $('startBtn').onclick = async () => {
+    try { await bgm.play(); bgm.pause(); } catch (e) {}      // unlock audio on iOS/Android
+    try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); ac.resume(); } catch (e) {}
+    $('start').classList.add('hidden');
+    $('hud').classList.remove('hidden');
+    $('scan').classList.remove('hidden');
+    const sys = sceneEl.systems['mindar-image-system'];
+    try { await sys.start(); } catch (e) {
+      $('start').classList.remove('hidden'); $('hud').classList.add('hidden'); $('scan').classList.add('hidden');
+      $('start').querySelector('p').textContent = 'Could not start the camera. Allow camera access and make sure the page is opened over HTTPS.';
+    }
+  };
+
   function boot() {
     build();
     sceneEl.canvas.addEventListener('pointerup', onPointerUp);
+    requestAnimationFrame(frame);
     const tgt = $('target');
     tgt.addEventListener('targetFound', () => {
       tracking = true;
       $('scan').classList.add('hidden');
       bgm.play().catch(() => {});
+      if (!toldHint) { toldHint = true; toast('Tap the rings · grab the coins'); }
     });
     tgt.addEventListener('targetLost', () => {
-      tracking = false;
+      tracking = false; stopTour(false);
       $('scan').classList.remove('hidden');
       bgm.pause();
       $('panel').classList.remove('open');
@@ -337,7 +528,7 @@
   }
   if (sceneEl.hasLoaded) boot(); else sceneEl.addEventListener('loaded', boot);
 
-  window.__ar = { onTap, HOTSPOTS };   // handy for testing
+  window.__ar = { onTap, HOTSPOTS, makeSnap, startTour, stopTour };   // handy for testing
 })();
 </script>
 </body>
