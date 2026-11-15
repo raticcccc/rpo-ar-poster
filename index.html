@@ -4,8 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Ready Player One – AR Poster</title>
+<!-- Libraries: load from ./vendor first; if a file is missing on the host, fall back to the jsDelivr CDN -->
 <script src="vendor/aframe-v1.5.0.min.js"></script>
+<script>window.AFRAME || document.write('<script src="https://cdn.jsdelivr.net/npm/aframe@1.5.0/dist/aframe-v1.5.0.min.js"><\/script>');</script>
 <script src="vendor/mindar-image-aframe.prod.js"></script>
+<script>(window.AFRAME && !AFRAME.systems['mindar-image-system']) && document.write('<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"><\/script>');</script>
 <style>
   :root{--pink:#ff2d95;--cyan:#27e1ff;--gold:#ffd23c;--ink:#0b0720;--glass:rgba(14,8,40,.82)}
   *{box-sizing:border-box}
@@ -117,6 +120,13 @@
 
 <script>
 (function () {
+  // If the AR libraries failed to load, say so clearly instead of a blank/broken page
+  if (!window.AFRAME || !AFRAME.systems['mindar-image-system']) {
+    const p = document.querySelector('#start p'); const b = document.getElementById('startBtn');
+    if (p) p.textContent = 'The AR libraries did not load. In the GitHub repo, check that the vendor folder contains aframe-v1.5.0.min.js and mindar-image-aframe.prod.js, then refresh.';
+    if (b) b.classList.add('hidden');
+    return;
+  }
   // ---------- Poster geometry ----------
   const IMG_W = 741, IMG_H = 1145;           // pixel size of assets/poster.jpg
   const ASPECT = IMG_H / IMG_W;
